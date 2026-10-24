@@ -1,0 +1,18 @@
+﻿# Docker ignore file
+__pycache__/
+*.py[cod]
+*\.class
+*.so
+.Python
+venv/
+ENV/
+.vscode/
+.git/
+.gitignore
+*.md
+!README.md
+.kiro/
+BRANDING_UPDATE.md
+DEPLOYMENT_GUIDE.md
+*.txt
+!requirements-production.txt

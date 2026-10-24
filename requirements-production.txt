@@ -1,0 +1,6 @@
+﻿# Add gunicorn to requirements
+flask
+pandas
+werkzeug
+qrcode[pil]
+gunicorn

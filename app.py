@@ -9,6 +9,14 @@ import database
 app = Flask(__name__)
 app.secret_key = 'hackathon-secret-key-change-in-production'  # Change for production!
 
+import os
+
+# Production configuration
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 # CORS headers for mobile app development
 @app.after_request
 def after_request(response):
@@ -469,7 +477,10 @@ if __name__ == '__main__':
     print('        -d \'{"username":"sarah.chen","password":"demo123"}\'')
     print("\n" + "="*50 + "\n")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    app.run(host='0.0.0.0', port=port, debug=debug)
+
 
 
 
