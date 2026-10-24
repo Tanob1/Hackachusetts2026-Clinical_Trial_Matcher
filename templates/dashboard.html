@@ -19,16 +19,29 @@
             font-weight: bold;
             font-size: 20px;
         }
-        .navbar-text {
-            color: white !important;
+        .patient-switcher {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            margin-right: 15px;
+            transition: all 0.3s;
         }
-        .btn-logout {
+        .patient-switcher:focus {
+            background: rgba(255,255,255,0.25);
+            color: white;
+            border-color: white;
+        }
+        .patient-switcher option {
+            color: #333;
+        }
+        .btn-logout, .btn-compare {
             background: rgba(255,255,255,0.2);
             border: 1px solid white;
             color: white;
             transition: all 0.3s;
+            margin-left: 10px;
         }
-        .btn-logout:hover {
+        .btn-logout:hover, .btn-compare:hover {
             background: white;
             color: #667eea;
         }
@@ -58,13 +71,6 @@
             display: inline-block;
             margin: 5px 5px 5px 0;
         }
-        .filters-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
         .trial-card {
             background: white;
             border-radius: 10px;
@@ -73,10 +79,23 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             transition: all 0.3s;
             cursor: pointer;
+            position: relative;
         }
         .trial-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .trial-card-selected {
+            border: 3px solid #667eea;
+            background: #f8f9ff;
+        }
+        .compare-checkbox {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
         }
         .match-score {
             font-size: 20px;
@@ -97,11 +116,6 @@
             background: #f8d7da;
             color: #721c24;
         }
-        .trial-meta {
-            color: #6c757d;
-            font-size: 14px;
-            margin: 10px 0;
-        }
         .trial-title {
             font-size: 18px;
             font-weight: 600;
@@ -117,22 +131,25 @@
             display: inline-block;
             margin-right: 5px;
         }
-        .loading {
-            text-align: center;
-            padding: 50px;
-        }
-        .no-results {
-            text-align: center;
-            padding: 50px;
-            color: #6c757d;
-        }
         .results-count {
             font-size: 24px;
             font-weight: bold;
             color: #667eea;
             margin-bottom: 20px;
         }
-        /* Modal styles */
+        .comparison-table {
+            width: 100%;
+        }
+        .comparison-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .comparison-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
         .modal-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -140,41 +157,54 @@
         .detail-label {
             font-weight: 600;
             color: #495057;
+            margin-top: 15px;
         }
-        .detail-value {
-            color: #212529;
-            margin-bottom: 15px;
+        .icd10-badge {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-family: monospace;
+            display: inline-block;
+            margin-right: 3px;
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
     <nav class="navbar navbar-expand-lg">
         <div class="container-fluid">
             <span class="navbar-brand">🏥 Clinical Trial Matcher</span>
-            <div class="d-flex">
-                <span class="navbar-text me-3" id="patientNameNav">Loading...</span>
+            <div class="d-flex align-items-center">
+                <select class="form-select patient-switcher" id="patientSwitcher" onchange="switchPatient()">
+                    <option value="">Loading patients...</option>
+                </select>
+                <button class="btn btn-compare btn-sm" id="compareBtn" onclick="compareTrials()" disabled>
+                    Compare (<span id="compareCount">0</span>)
+                </button>
                 <button class="btn btn-logout btn-sm" onclick="logout()">Logout</button>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <!-- Patient Profile Card -->
         <div class="patient-card" id="patientProfile">
             <div class="d-flex justify-content-between align-items-start">
-                <div>
+                <div class="flex-grow-1">
                     <div class="patient-name" id="patientName">Loading...</div>
                     <div class="patient-info" id="patientInfo">Loading...</div>
+                    <div class="mt-3" id="conditionsList">
+                        <strong>Conditions:</strong>
+                    </div>
                 </div>
-            </div>
-            <div class="mt-3" id="conditionsList">
-                <strong>Conditions:</strong>
+                <div class="alert alert-info mb-0" style="max-width: 250px;">
+                    <small><strong>🔬 Medical Intelligence</strong><br>
+                    Using ICD-10 codes for accurate matching</small>
+                </div>
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="filters-card">
+        <div class="filters-card" style="background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
             <div class="row">
                 <div class="col-md-4">
                     <label class="form-label">Maximum Distance</label>
@@ -197,30 +227,17 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Search Trials</label>
-                    <input type="text" class="form-control" id="searchInput" 
+                    <input type="text" class="form-select" id="searchInput" 
                            placeholder="Search by keyword..." onkeyup="filterTrials()">
                 </div>
             </div>
         </div>
 
-        <!-- Results Count -->
         <div class="results-count" id="resultsCount">Loading matches...</div>
-
-        <!-- Loading State -->
-        <div class="loading d-none" id="loadingState">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-3">Finding relevant trials...</p>
+        <div class="loading d-none text-center py-5" id="loadingState">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3">Finding relevant trials with medical code intelligence...</p>
         </div>
-
-        <!-- No Results State -->
-        <div class="no-results d-none" id="noResults">
-            <h4>No trials found</h4>
-            <p>Try adjusting your filters to see more results.</p>
-        </div>
-
-        <!-- Trials List -->
         <div id="trialsList"></div>
     </div>
 
@@ -232,11 +249,26 @@
                     <h5 class="modal-title" id="modalTitle">Trial Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body" id="modalBody">
-                    <!-- Trial details will be populated here -->
-                </div>
+                <div class="modal-body" id="modalBody"></div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div class="modal fade" id="compareModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Trial Comparison</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="compareBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">Print Comparison</button>
                 </div>
             </div>
         </div>
@@ -246,20 +278,62 @@
     <script>
         let currentPatient = null;
         let allMatches = [];
-        let trialModal = null;
+        let allPatients = [];
+        let selectedTrials = new Set();
+        let trialModal, compareModal;
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             trialModal = new bootstrap.Modal(document.getElementById('trialModal'));
+            compareModal = new bootstrap.Modal(document.getElementById('compareModal'));
+            loadDemoPatients();
             loadPatientProfile();
         });
 
-        async function loadPatientProfile() {
+        async function loadDemoPatients() {
             try {
-                const response = await fetch('/api/patient/me', {
+                const response = await fetch('/api/demo/patients');
+                const data = await response.json();
+                allPatients = data.patients;
+                
+                const switcher = document.getElementById('patientSwitcher');
+                switcher.innerHTML = allPatients.map(p => 
+                    `<option value="${p.id}">${p.name} - ${p.conditions.split(',')[0]}</option>`
+                ).join('');
+                
+                // Select current patient
+                if (currentPatient) {
+                    switcher.value = currentPatient.id;
+                }
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        async function switchPatient() {
+            const patientId = document.getElementById('patientSwitcher').value;
+            if (!patientId) return;
+            
+            try {
+                const response = await fetch(`/api/demo/switch/${patientId}`, {
+                    method: 'POST',
                     credentials: 'include'
                 });
                 
+                if (response.ok) {
+                    // Clear selections
+                    selectedTrials.clear();
+                    updateCompareButton();
+                    // Reload profile and matches
+                    await loadPatientProfile();
+                }
+            } catch (error) {
+                console.error('Error switching patient:', error);
+            }
+        }
+
+        async function loadPatientProfile() {
+            try {
+                const response = await fetch('/api/patient/me', { credentials: 'include' });
                 if (!response.ok) {
                     if (response.status === 401) {
                         window.location.href = '/';
@@ -271,13 +345,10 @@
                 const patient = await response.json();
                 currentPatient = patient;
                 
-                // Update UI
                 document.getElementById('patientName').textContent = patient.name;
-                document.getElementById('patientNameNav').textContent = patient.name;
                 document.getElementById('patientInfo').textContent = 
                     `${patient.age} years old | ${patient.gender} | ${patient.city}, MA`;
                 
-                // Display conditions
                 const conditions = patient.conditions.split(',').map(c => c.trim());
                 const conditionsList = document.getElementById('conditionsList');
                 conditionsList.innerHTML = '<strong>Conditions:</strong> ';
@@ -288,11 +359,12 @@
                     conditionsList.appendChild(badge);
                 });
                 
-                // Load matches
+                // Update switcher selection
+                document.getElementById('patientSwitcher').value = patient.id;
+                
                 loadMatches();
             } catch (error) {
                 console.error('Error loading profile:', error);
-                alert('Error loading patient profile');
             }
         }
 
@@ -302,10 +374,8 @@
             const distance = document.getElementById('distanceFilter').value;
             const phase = document.getElementById('phaseFilter').value;
             
-            // Show loading
             document.getElementById('loadingState').classList.remove('d-none');
             document.getElementById('trialsList').innerHTML = '';
-            document.getElementById('noResults').classList.add('d-none');
             
             try {
                 const url = `/api/matches/${currentPatient.id}?max_distance=${distance}` + 
@@ -315,20 +385,14 @@
                 const data = await response.json();
                 
                 allMatches = data.matches;
-                
-                // Hide loading
                 document.getElementById('loadingState').classList.add('d-none');
-                
-                // Update count
                 document.getElementById('resultsCount').textContent = 
                     `📊 ${allMatches.length} Matched Trial${allMatches.length !== 1 ? 's' : ''}`;
                 
-                // Display trials
                 displayTrials(allMatches);
             } catch (error) {
                 console.error('Error loading matches:', error);
                 document.getElementById('loadingState').classList.add('d-none');
-                alert('Error loading matches');
             }
         }
 
@@ -337,7 +401,7 @@
             container.innerHTML = '';
             
             if (trials.length === 0) {
-                document.getElementById('noResults').classList.remove('d-none');
+                container.innerHTML = '<div class="text-center py-5"><h4>No trials found</h4><p>Try adjusting your filters</p></div>';
                 return;
             }
             
@@ -349,31 +413,31 @@
 
         function createTrialCard(match) {
             const card = document.createElement('div');
-            card.className = 'trial-card';
-            card.onclick = () => showTrialDetails(match);
+            card.className = 'trial-card' + (selectedTrials.has(match.trial_id) ? ' trial-card-selected' : '');
             
             const scoreClass = match.match_score >= 70 ? 'score-high' : 
                              match.match_score >= 40 ? 'score-medium' : 'score-low';
             
             card.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="flex-grow-1">
-                        <div>
-                            <span class="match-score ${scoreClass}">${match.match_percentage} Match</span>
-                            <span class="trial-meta ms-3">
-                                📍 ${match.distance_miles} miles | ${match.phase} | ${match.status}
-                            </span>
-                        </div>
-                        <div class="trial-title">${match.title}</div>
-                        <div class="mt-2">
-                            <strong style="font-size: 14px;">Matched Conditions:</strong>
-                            ${match.matched_conditions.map(c => 
-                                `<span class="matched-condition">✓ ${c}</span>`
-                            ).join('')}
-                        </div>
-                        <div class="mt-2" style="font-size: 13px; color: #6c757d;">
-                            ${match.match_explanation}
-                        </div>
+                <input type="checkbox" class="compare-checkbox" 
+                       ${selectedTrials.has(match.trial_id) ? 'checked' : ''}
+                       onchange="toggleCompare(${match.trial_id}, this.checked)">
+                <div onclick="showTrialDetails(${match.trial_id})">
+                    <div>
+                        <span class="match-score ${scoreClass}">${match.match_percentage} Match</span>
+                        <span class="trial-meta ms-3">
+                            📍 ${match.distance_miles} miles | ${match.phase}
+                        </span>
+                    </div>
+                    <div class="trial-title">${match.title}</div>
+                    <div class="mt-2">
+                        <strong style="font-size: 14px;">Matched Conditions:</strong>
+                        ${match.matched_conditions.map(c => 
+                            `<span class="matched-condition">✓ ${c}</span>`
+                        ).join('')}
+                    </div>
+                    <div class="mt-2" style="font-size: 13px; color: #6c757d;">
+                        ${match.match_explanation}
                     </div>
                 </div>
             `;
@@ -381,42 +445,120 @@
             return card;
         }
 
-        function showTrialDetails(match) {
+        function toggleCompare(trialId, checked) {
+            if (checked) {
+                if (selectedTrials.size >= 3) {
+                    alert('Maximum 3 trials can be compared at once');
+                    event.target.checked = false;
+                    return;
+                }
+                selectedTrials.add(trialId);
+            } else {
+                selectedTrials.delete(trialId);
+            }
+            updateCompareButton();
+            displayTrials(allMatches); // Refresh display
+        }
+
+        function updateCompareButton() {
+            const btn = document.getElementById('compareBtn');
+            const count = document.getElementById('compareCount');
+            count.textContent = selectedTrials.size;
+            btn.disabled = selectedTrials.size < 2;
+        }
+
+        function compareTrials() {
+            if (selectedTrials.size < 2) return;
+            
+            const trials = allMatches.filter(m => selectedTrials.has(m.trial_id));
+            const tbody = document.getElementById('compareBody');
+            
+            tbody.innerHTML = `
+                <table class="comparison-table table">
+                    <thead>
+                        <tr>
+                            <th>Attribute</th>
+                            ${trials.map(t => `<th>${t.title.substring(0, 40)}...</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Match Score</strong></td>
+                            ${trials.map(t => `<td><span class="match-score ${t.match_score >= 70 ? 'score-high' : t.match_score >= 40 ? 'score-medium' : 'score-low'}">${t.match_percentage}</span></td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>Phase</strong></td>
+                            ${trials.map(t => `<td>${t.phase}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>Distance</strong></td>
+                            ${trials.map(t => `<td>${t.distance_miles} miles</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>Location</strong></td>
+                            ${trials.map(t => `<td>${t.city}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>Age Range</strong></td>
+                            ${trials.map(t => `<td>${t.min_age}-${t.max_age} years ${t.age_eligible ? '<span class="badge bg-success">Eligible</span>' : '<span class="badge bg-warning">Outside range</span>'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>Conditions</strong></td>
+                            ${trials.map(t => `<td>${t.conditions}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>NCT ID</strong></td>
+                            ${trials.map(t => `<td><a href="https://clinicaltrials.gov/study/${t.nct_id}" target="_blank">${t.nct_id}</a></td>`).join('')}
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+            
+            compareModal.show();
+        }
+
+        function showTrialDetails(trialId) {
+            const match = allMatches.find(m => m.trial_id === trialId);
+            if (!match) return;
+            
             document.getElementById('modalTitle').textContent = match.title;
             document.getElementById('modalBody').innerHTML = `
                 <div class="detail-label">NCT ID</div>
-                <div class="detail-value"><a href="https://clinicaltrials.gov/study/${match.nct_id}" target="_blank">${match.nct_id}</a></div>
+                <div><a href="https://clinicaltrials.gov/study/${match.nct_id}" target="_blank">${match.nct_id}</a></div>
                 
                 <div class="detail-label">Match Score</div>
-                <div class="detail-value">
-                    <span class="match-score ${match.match_score >= 70 ? 'score-high' : match.match_score >= 40 ? 'score-medium' : 'score-low'}">
-                        ${match.match_percentage}
-                    </span>
-                </div>
+                <div><span class="match-score ${match.match_score >= 70 ? 'score-high' : match.match_score >= 40 ? 'score-medium' : 'score-low'}">${match.match_percentage}</span></div>
                 
                 <div class="detail-label">Match Explanation</div>
-                <div class="detail-value">${match.match_explanation}</div>
+                <div>${match.match_explanation}</div>
+                
+                ${match.match_details && match.match_details.length > 0 ? `
+                <div class="detail-label">Match Details</div>
+                <div>${match.match_details.map(d => `
+                    <div class="alert alert-info py-2 my-2">
+                        <strong>${d.type}:</strong> ${d.patient} ↔ ${d.trial}
+                        ${d.codes ? `<br><small>ICD-10: ${d.codes.map(c => `<span class="icd10-badge">${c}</span>`).join('')}</small>` : ''}
+                    </div>
+                `).join('')}</div>
+                ` : ''}
                 
                 <div class="detail-label">Phase & Status</div>
-                <div class="detail-value">${match.phase} | ${match.status}</div>
+                <div>${match.phase} | ${match.status}</div>
                 
                 <div class="detail-label">Location</div>
-                <div class="detail-value">${match.city} (${match.distance_miles} miles from Boston)</div>
+                <div>${match.city} (${match.distance_miles} miles)</div>
                 
                 <div class="detail-label">Age Eligibility</div>
-                <div class="detail-value">
-                    Ages ${match.min_age} - ${match.max_age}
-                    ${match.age_eligible ? 
-                        '<span class="badge bg-success ms-2">You are eligible</span>' : 
-                        '<span class="badge bg-warning ms-2">Outside age range</span>'}
+                <div>Ages ${match.min_age}-${match.max_age} 
+                    ${match.age_eligible ? '<span class="badge bg-success ms-2">You are eligible</span>' : 
+                                          '<span class="badge bg-warning ms-2">Outside age range</span>'}
                 </div>
                 
                 <div class="detail-label">All Conditions Studied</div>
-                <div class="detail-value">${match.conditions}</div>
+                <div>${match.conditions}</div>
                 
                 <div class="alert alert-info mt-3">
                     <strong>Next Steps:</strong> Contact your healthcare provider to discuss this trial.
-                    Visit <a href="https://clinicaltrials.gov/study/${match.nct_id}" target="_blank">ClinicalTrials.gov</a> for more information.
                 </div>
             `;
             
@@ -425,7 +567,6 @@
 
         function filterTrials() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
             if (!searchTerm) {
                 displayTrials(allMatches);
                 return;
@@ -443,13 +584,9 @@
 
         async function logout() {
             try {
-                await fetch('/logout', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
+                await fetch('/logout', { method: 'POST', credentials: 'include' });
                 window.location.href = '/';
             } catch (error) {
-                console.error('Error logging out:', error);
                 window.location.href = '/';
             }
         }
