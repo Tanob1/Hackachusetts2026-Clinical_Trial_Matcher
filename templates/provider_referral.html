@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provider Portal - Referral QR Code</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .qr-container { max-width: 600px; margin: 50px auto; }
+        .qr-code { background: white; padding: 30px; border-radius: 15px; text-align: center; }
+        @media print {
+            .no-print { display: none; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark no-print">
+        <div class="container-fluid">
+            <a href="/provider/search" class="navbar-brand">← Back to Search</a>
+            <div class="d-flex">
+                <span class="text-white me-3">{{ provider_name }}</span>
+                <form action="/provider/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container qr-container">
+        <div class="card shadow">
+            <div class="card-body p-5 text-center">
+                <h2 class="text-success mb-3">✅ Referral Created!</h2>
+                
+                <div class="alert alert-info text-start">
+                    <strong>Patient:</strong> {{ referral.patient_name }}, {{ referral.patient_age }}yo<br>
+                    <strong>Trial:</strong> {{ referral.trial_title[:60] }}{% if referral.trial_title|length > 60 %}...{% endif %}<br>
+                    <strong>NCT ID:</strong> {{ referral.nct_id }}<br>
+                    <strong>Phase:</strong> {{ referral.phase }}<br>
+                    <strong>Referral Code:</strong> <code>{{ referral.referral_code }}</code>
+                </div>
+
+                <div class="qr-code mb-4">
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 300px;">
+                </div>
+
+                <p class="lead">Patient can scan this QR code with the mobile app</p>
+
+                <div class="no-print">
+                    <button onclick="window.print()" class="btn btn-primary btn-lg me-2">
+                        🖨️ Print QR Code
+                    </button>
+                    <a href="/provider/search" class="btn btn-outline-secondary btn-lg">
+                        Done
+                    </a>
+                </div>
+
+                <div class="mt-4 text-muted small">
+                    <p class="mb-0">Generated: {{ referral.created_at }}</p>
+                    {% if referral.provider_notes %}
+                    <p class="mb-0"><strong>Notes:</strong> {{ referral.provider_notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-focus for easy printing
+        window.addEventListener('load', function() {
+            console.log('Referral created:', '{{ referral.referral_code }}');
+        });
+    </script>
+</body>
+</html>
