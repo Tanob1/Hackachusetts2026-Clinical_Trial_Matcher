@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Trial Matcher - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo h1 {
+            color: #667eea;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .logo p {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-primary {
+            background: #667eea;
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .demo-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        .demo-info h6 {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .demo-info p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #495057;
+        }
+        .alert {
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>🏥 Clinical Trial Matcher</h1>
+            <p>Connecting patients with life-saving research</p>
+        </div>
+
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+
+        <form id="loginForm">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" required 
+                       placeholder="Enter username">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required 
+                       placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="loginBtn">
+                <span id="loginText">Login</span>
+                <span id="loginSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+            </button>
+        </form>
+
+        <div class="demo-info">
+            <h6>Demo Accounts</h6>
+            <p><strong>sarah.chen</strong> - Breast Cancer patient (Age 42)</p>
+            <p><strong>john.smith</strong> - Diabetes & Hypertension (Age 55)</p>
+            <p><strong>maria.garcia</strong> - COPD & Heart Disease (Age 68)</p>
+            <p><strong>david.lee</strong> - Depression & Anxiety (Age 34)</p>
+            <p><strong>emily.brown</strong> - Multiple Sclerosis (Age 45)</p>
+            <p class="mt-2"><em>All passwords: <strong>demo123</strong></em></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginText = document.getElementById('loginText');
+            const loginSpinner = document.getElementById('loginSpinner');
+            
+            // Show loading state
+            loginBtn.disabled = true;
+            loginText.classList.add('d-none');
+            loginSpinner.classList.remove('d-none');
+            errorDiv.classList.add('d-none');
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Redirect to dashboard
+                    window.location.href = '/dashboard';
+                } else {
+                    // Show error
+                    errorDiv.textContent = data.message || 'Invalid credentials';
+                    errorDiv.classList.remove('d-none');
+                    
+                    // Reset button
+                    loginBtn.disabled = false;
+                    loginText.classList.remove('d-none');
+                    loginSpinner.classList.add('d-none');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.classList.remove('d-none');
+                
+                // Reset button
+                loginBtn.disabled = false;
+                loginText.classList.remove('d-none');
+                loginSpinner.classList.add('d-none');
+            }
+        });
+
+        // Quick fill for demo (click on demo account to auto-fill)
+        document.querySelectorAll('.demo-info p').forEach((p, index) => {
+            if (index < 5) {  // Only demo accounts
+                p.style.cursor = 'pointer';
+                p.addEventListener('click', () => {
+                    const username = p.querySelector('strong').textContent;
+                    document.getElementById('username').value = username;
+                    document.getElementById('password').value = 'demo123';
+                });
+            }
+        });
+    </script>
+</body>
+</html>
