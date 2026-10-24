@@ -5,7 +5,23 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_size=10, max_overflow=20)
+# Configure engine based on database type
+if settings.DATABASE_URL.startswith("sqlite"):
+    # SQLite configuration - no pool settings needed
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
+else:
+    # PostgreSQL configuration
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        pool_size=10,
+        max_overflow=20
+    )
+
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -15,7 +31,7 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncSession:
-    """FastAPI dependency — yields an async DB session."""
+    """FastAPI dependency - yields an async DB session."""
     async with async_session() as session:
         try:
             yield session

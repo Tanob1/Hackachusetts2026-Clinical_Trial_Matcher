@@ -1,12 +1,13 @@
 """Configuration settings loaded from environment variables."""
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/trial_matcher"
-    TEST_DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/trial_matcher_test"
+    # Database - using SQLite for hackathon MVP
+    DATABASE_URL: str = "sqlite+aiosqlite:///./trials.db"
+    TEST_DATABASE_URL: str = "sqlite+aiosqlite:///./test_trials.db"
 
     # JWT
     JWT_SECRET_KEY: str = "change-this-to-a-long-random-string"
