@@ -1,33 +1,58 @@
 ﻿"""
-Clinical Trial Matching Engine
-Keyword-based matching with age eligibility scoring
+Enhanced Clinical Trial Matching Engine
+Uses medical codes (ICD-10) + keyword matching + age eligibility
 """
 import database
+import medical_codes
+from functools import lru_cache
 
-def calculate_match_score(patient, trial):
+# Cache for match results (in-memory for MVP)
+_match_cache = {}
+
+def calculate_match_score_enhanced(patient, trial):
     """
-    Calculate match score between patient and trial
+    Enhanced match score calculation using medical codes
     Returns dict with score, matched conditions, and explanation
     """
     score = 0
     matched_conditions = []
     explanations = []
+    match_details = []
     
-    # Parse patient conditions (comma-separated, case-insensitive)
-    patient_conds = set(c.strip().lower() for c in patient['conditions'].split(','))
+    # Use medical code matching
+    matches = medical_codes.find_matching_conditions(
+        patient['conditions'],
+        trial['conditions']
+    )
     
-    # Parse trial conditions (comma-separated, case-insensitive)
-    trial_conds = set(c.strip().lower() for c in trial['conditions'].split(','))
-    
-    # Condition keyword overlap (30 points per match)
-    # Check if any patient condition keyword appears in any trial condition
-    for p_cond in patient_conds:
-        for t_cond in trial_conds:
-            if p_cond in t_cond or t_cond in p_cond:
-                score += 30
-                matched_conditions.append(p_cond)
-                explanations.append(f"Matched condition: {p_cond.title()}")
-                break  # Avoid double-counting same patient condition
+    # Calculate score from matches
+    for match in matches:
+        if match['match_type'] == 'icd10_exact':
+            # Perfect match via ICD-10 code
+            score += 50  # Higher weight for medical code matches
+            matched_conditions.append(match['normalized_patient'])
+            match_details.append({
+                'patient': match['patient_condition'],
+                'trial': match['trial_condition'],
+                'type': 'Medical Code Match (ICD-10)',
+                'codes': match['icd10_codes']
+            })
+            explanations.append(
+                f"Perfect match: {match['patient_condition']} ↔ {match['trial_condition']} "
+                f"(ICD-10: {', '.join(match['icd10_codes'])})"
+            )
+        elif match['match_type'] == 'keyword':
+            # Keyword/synonym match
+            score += match['match_score']
+            matched_conditions.append(match['normalized_patient'])
+            match_details.append({
+                'patient': match['patient_condition'],
+                'trial': match['trial_condition'],
+                'type': 'Keyword Match'
+            })
+            explanations.append(
+                f"Condition match: {match['patient_condition']}"
+            )
     
     # Age eligibility bonus (20 points)
     age_eligible = False
@@ -35,9 +60,9 @@ def calculate_match_score(patient, trial):
         if trial['min_age'] <= patient['age'] <= trial['max_age']:
             score += 20
             age_eligible = True
-            explanations.append(f"Age {patient['age']} is within trial range ({trial['min_age']}-{trial['max_age']})")
-        else:
-            explanations.append(f"Age {patient['age']} is outside trial range ({trial['min_age']}-{trial['max_age']})")
+            explanations.append(
+                f"Age {patient['age']} within range ({trial['min_age']}-{trial['max_age']})"
+            )
     
     # Cap score at 100
     score = min(score, 100)
@@ -59,25 +84,31 @@ def calculate_match_score(patient, trial):
         'distance_miles': trial['distance_from_boston'],
         'match_score': score,
         'match_percentage': f"{score}%",
-        'matched_conditions': list(set(matched_conditions)),  # Remove duplicates
+        'matched_conditions': list(set(matched_conditions)),
         'match_explanation': explanation,
+        'match_details': match_details,
         'age_eligible': age_eligible,
         'min_age': trial['min_age'],
         'max_age': trial['max_age']
     }
 
-def get_matches(patient, max_distance=100, phase_filter=None):
+@lru_cache(maxsize=100)
+def get_matches_cached(patient_id, patient_conditions, patient_age, max_distance=100, phase_filter=None):
     """
-    Get matched trials for a patient
-    
-    Args:
-        patient: Patient dict with conditions, age, etc.
-        max_distance: Maximum distance in miles from patient
-        phase_filter: Optional phase filter (e.g., 'PHASE3')
-    
-    Returns:
-        List of matched trials with scores, sorted by relevance
+    Cached version of get_matches for performance
+    Uses LRU cache to store recent match results
     """
+    # This is called from get_matches with cacheable parameters
+    return _get_matches_internal(patient_id, patient_conditions, patient_age, max_distance, phase_filter)
+
+def _get_matches_internal(patient_id, patient_conditions, patient_age, max_distance, phase_filter):
+    """Internal matching logic"""
+    patient = {
+        'id': patient_id,
+        'conditions': patient_conditions,
+        'age': patient_age
+    }
+    
     # Get all trials
     trials = database.get_all_trials()
     matches = []
@@ -92,7 +123,7 @@ def get_matches(patient, max_distance=100, phase_filter=None):
             continue
         
         # Calculate match score
-        match = calculate_match_score(patient, trial)
+        match = calculate_match_score_enhanced(patient, trial)
         
         # Only include trials with some match
         if match['match_score'] > 0:
@@ -104,25 +135,71 @@ def get_matches(patient, max_distance=100, phase_filter=None):
     # Return top 20 matches
     return matches[:20]
 
+def get_matches(patient, max_distance=100, phase_filter=None):
+    """
+    Get matched trials for a patient
+    Uses caching for improved performance
+    
+    Args:
+        patient: Patient dict with conditions, age, etc.
+        max_distance: Maximum distance in miles from patient
+        phase_filter: Optional phase filter (e.g., 'PHASE3')
+    
+    Returns:
+        List of matched trials with scores, sorted by relevance
+    """
+    # Use cached version
+    return get_matches_cached(
+        patient['id'],
+        patient['conditions'],
+        patient['age'],
+        max_distance,
+        phase_filter or ''
+    )
+
+def clear_cache():
+    """Clear the match cache (useful for testing/updates)"""
+    get_matches_cached.cache_clear()
+    global _match_cache
+    _match_cache = {}
+
 # For testing
 if __name__ == '__main__':
-    print("Testing matching engine...")
+    print("Testing enhanced matching engine...\n")
     
     # Get a sample patient
     patient = database.get_patient_by_user_id(1)
-    print(f"\nPatient: {patient['name']}")
+    print(f"Patient: {patient['name']}")
     print(f"Conditions: {patient['conditions']}")
-    print(f"Age: {patient['age']}")
+    print(f"Age: {patient['age']}\n")
     
-    # Get matches
+    # Test performance with timing
+    import time
+    
+    # First call (no cache)
+    start = time.time()
     matches = get_matches(patient, max_distance=50)
-    print(f"\nFound {len(matches)} matches within 50 miles")
+    elapsed_first = (time.time() - start) * 1000
     
-    # Show top 3
-    print("\nTop 3 Matches:")
+    print(f"First call (no cache): {elapsed_first:.0f}ms")
+    print(f"Found {len(matches)} matches within 50 miles\n")
+    
+    # Second call (with cache)
+    start = time.time()
+    matches = get_matches(patient, max_distance=50)
+    elapsed_cached = (time.time() - start) * 1000
+    
+    print(f"Second call (cached): {elapsed_cached:.0f}ms")
+    print(f"Performance improvement: {(elapsed_first / elapsed_cached):.1f}x faster\n")
+    
+    # Show top 3 matches
+    print("Top 3 Matches (with medical code intelligence):")
     for i, match in enumerate(matches[:3], 1):
         print(f"\n{i}. {match['title'][:60]}...")
-        print(f"   Score: {match['match_percentage']}")
+        print(f"   Score: {match['match_percentage']} (enhanced algorithm)")
         print(f"   Distance: {match['distance_miles']} miles")
         print(f"   Matched: {', '.join(match['matched_conditions'])}")
         print(f"   Explanation: {match['match_explanation']}")
+        if match.get('match_details'):
+            for detail in match['match_details']:
+                print(f"   • {detail['type']}: {detail['patient']} ↔ {detail['trial']}")
