@@ -458,7 +458,7 @@ def health():
 
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("[START] Clinical Trial Matcher API Server")
+    print("[START] LinkRTC API Server")
     print("="*50)
     print("\n[WEB] Web App: http://localhost:5000")
     print("[DOCS] API Documentation: See API_DOCUMENTATION.md")
@@ -470,6 +470,7 @@ if __name__ == '__main__':
     print("\n" + "="*50 + "\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
 
 
