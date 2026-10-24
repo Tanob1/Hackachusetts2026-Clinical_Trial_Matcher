@@ -1,8 +1,7 @@
 """Database models.
 
-Two-schema separation for HIPAA compliance:
-  auth   — user identity (email/phone, password hash, refresh tokens)
-  medical — PHI (conditions, meds, allergies, etc.) linked by internal UUID
+SQLite-compatible version - schemas removed for SQLite support.
+For PostgreSQL, schemas would be: auth, medical, public
 """
 from __future__ import annotations
 
@@ -14,13 +13,14 @@ from sqlalchemy import (
     Column, String, Integer, Float, Text, DateTime, Boolean, ForeignKey, Enum,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON  # Use JSON instead of JSONB for SQLite compatibility
 from sqlalchemy.orm import relationship
 
 from app.database import Base
 
 
-# ── Enumerations ──────────────────────────────────────────────────────────────
+# -- Enumerations --
 
 class SexAssignedAtBirth(str, PyEnum):
     male = "male"
@@ -51,7 +51,7 @@ class PregnancyStatus(str, PyEnum):
 
 class TrialStatus(str, PyEnum):
     recruiting = "recruiting"
-    active = "active"          # active, not recruiting
+    active = "active"
     completed = "completed"
     not_yet_recruiting = "not_yet_recruiting"
     terminated = "terminated"
@@ -65,106 +65,93 @@ class MatchStrength(str, PyEnum):
     low = "low"
 
 
-# ── AUTH schema (identity) ────────────────────────────────────────────────────
+# -- Models (no schema specifications for SQLite) --
 
 class User(Base):
-    """User identity — stored in the `auth` schema."""
+    """User identity."""
     __tablename__ = "users"
-    __table_args__ = {"schema": "auth"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=True, index=True)
     phone = Column(String(20), unique=True, nullable=True, index=True)
     password_hash = Column(String(255), nullable=False)
 
-    # Basic onboarding fields (not PHI — demographics used for matching)
     age = Column(Integer, nullable=True)
-    sex_assigned_at_birth = Column(Enum(SexAssignedAtBirth), nullable=True)
-    location_text = Column(String(255), nullable=True)  # "Boston, MA" or "02115"
+    sex_assigned_at_birth = Column(String(50), nullable=True)
+    location_text = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
-    # Push notification token (FCM)
     fcm_token = Column(String(255), nullable=True)
     notifications_enabled = Column(Boolean, default=True, nullable=False)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
-    """JWT refresh tokens for session management."""
+    """JWT refresh tokens."""
     __tablename__ = "refresh_tokens"
-    __table_args__ = {"schema": "auth"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("auth.users.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token = Column(String(512), unique=True, nullable=False, index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
     revoked = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="refresh_tokens")
 
 
-# ── MEDICAL schema (PHI) ───────────────────────────────────────────────────────
-
 class MedicalProfile(Base):
-    """Protected health information — stored in the `medical` schema.
-
-    Linked to auth.users only by the internal UUID. Never log this data.
-    """
+    """Protected health information."""
     __tablename__ = "medical_profiles"
-    __table_args__ = {"schema": "medical"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("auth.users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    conditions = Column(JSONB, default=list, nullable=False)          # ["Diabetes Type 2", "Hypertension"]
-    medications = Column(JSONB, default=list, nullable=False)          # ["Metformin", "Lisinopril"]
-    allergies = Column(JSONB, default=list, nullable=False)            # ["Penicillin"]
-    medical_history = Column(Text, nullable=True)                     # surgeries, hospitalizations
-    biomarkers = Column(Text, nullable=True)                           # free text lab values
-    smoking_status = Column(Enum(SmokingStatus), nullable=True)
-    alcohol_use = Column(Enum(AlcoholUse), nullable=True)
-    pregnancy_status = Column(Enum(PregnancyStatus), nullable=True)
+    conditions = Column(JSON, default=list, nullable=False)
+    medications = Column(JSON, default=list, nullable=False)
+    allergies = Column(JSON, default=list, nullable=False)
+    medical_history = Column(Text, nullable=True)
+    biomarkers = Column(Text, nullable=True)
+    smoking_status = Column(String(50), nullable=True)
+    alcohol_use = Column(String(50), nullable=True)
+    pregnancy_status = Column(String(50), nullable=True)
     travel_radius_miles = Column(Integer, default=50, nullable=False)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-
-# ── Clinical trials (public data) ─────────────────────────────────────────────
 
 class Trial(Base):
-    """Normalized clinical trial pulled from ClinicalTrials.gov v2 API."""
+    """Clinical trial from ClinicalTrials.gov."""
     __tablename__ = "trials"
-    __table_args__ = {"schema": "public"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    nct_id = Column(String(20), unique=True, nullable=False, index=True)  # NCT01234567
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    nct_id = Column(String(20), unique=True, nullable=False, index=True)
     title = Column(Text, nullable=False)
     brief_summary = Column(Text, nullable=True)
     detailed_description = Column(Text, nullable=True)
     phase = Column(String(50), nullable=True)
-    conditions = Column(JSONB, default=list, nullable=False)        # ["Diabetes Type 2"]
-    keywords = Column(JSONB, default=list, nullable=False)         # search keywords
+    conditions = Column(JSON, default=list, nullable=False)
+    keywords = Column(JSON, default=list, nullable=False)
     sponsor = Column(String(500), nullable=True)
-    locations = Column(JSONB, default=list, nullable=False)        # [{city, state, country, lat, lng, facility}]
+    locations = Column(JSON, default=list, nullable=False)
     eligibility_inclusion = Column(Text, nullable=True)
     eligibility_exclusion = Column(Text, nullable=True)
-    eligibility_sex = Column(String(50), nullable=True)            # "All", "Male", "Female"
-    eligibility_min_age = Column(String(50), nullable=True)        # "18 Years" or "N/A"
+    eligibility_sex = Column(String(50), nullable=True)
+    eligibility_min_age = Column(String(50), nullable=True)
     eligibility_max_age = Column(String(50), nullable=True)
-    enrollment_status = Column(Enum(TrialStatus), default=TrialStatus.unknown, nullable=False)
+    enrollment_status = Column(String(50), default="unknown", nullable=False)
     contact_name = Column(String(500), nullable=True)
     contact_phone = Column(String(100), nullable=True)
     contact_email = Column(String(255), nullable=True)
-    url = Column(String(1000), nullable=True)                    # ClinicalTrials.gov link
-    last_updated = Column(DateTime(timezone=True), nullable=True)
-    synced_at = Column(DateTime(timezone=True), server_default=func.now())
+    url = Column(String(1000), nullable=True)
+    last_updated = Column(DateTime, nullable=True)
+    synced_at = Column(DateTime, default=datetime.utcnow)
 
     saved_by = relationship("SavedTrial", back_populates="trial", cascade="all, delete-orphan")
 
@@ -172,13 +159,12 @@ class Trial(Base):
 class SavedTrial(Base):
     """User bookmarked trials."""
     __tablename__ = "saved_trials"
-    __table_args__ = {"schema": "public"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("auth.users.id", ondelete="CASCADE"), nullable=False, index=True)
-    trial_id = Column(UUID(as_uuid=True), ForeignKey("public.trials.id", ondelete="CASCADE"), nullable=False)
-    interested = Column(Boolean, default=False, nullable=False)  # "I'm interested" vs just saved
-    last_known_status = Column(Enum(TrialStatus), nullable=True)  # track status changes
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    trial_id = Column(String(36), ForeignKey("trials.id", ondelete="CASCADE"), nullable=False)
+    interested = Column(Boolean, default=False, nullable=False)
+    last_known_status = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     trial = relationship("Trial", back_populates="saved_by")
