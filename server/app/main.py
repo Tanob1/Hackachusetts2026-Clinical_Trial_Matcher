@@ -1,6 +1,6 @@
-﻿"""FastAPI application factory.
+"""FastAPI application factory.
 
-Clinical Trial Matcher â€” backend server.
+Clinical Trial Matcher — backend server.
 """
 import logging
 from contextlib import asynccontextmanager
@@ -13,13 +13,13 @@ import os
 
 from app.config import get_settings
 from app.database import init_db, async_session
-from app.routers import auth, profile, trials, settings as settings_router, admin
+from app.routers import profile, trials, settings as settings_router, admin
 from app.routers import sqlite_routes
 from app.ctgov_sync import sync_trials
 
 settings = get_settings()
 
-# Configure logging â€” never log medical profile contents
+# Configure logging — never log medical profile contents
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     """Application lifecycle: init DB + start scheduled sync."""
     logger.info("Starting Clinical Trial Matcher backend...")
 
-    # Create tables (development â€” use Alembic in production)
+    # Create tables (development — use Alembic in production)
     await init_db()
 
     # Start the ClinicalTrials.gov sync scheduler
@@ -117,7 +117,7 @@ async def web_login():
         return FileResponse(login_path)
     return {"error": "Login page not found"}
 # Routers
-app.include_router(auth.router)
+# app.include_router(auth.router)  # TODO: Implement auth router
 app.include_router(profile.router)
 app.include_router(trials.router)
 app.include_router(settings_router.router)

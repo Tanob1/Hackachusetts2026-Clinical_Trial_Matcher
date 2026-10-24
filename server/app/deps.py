@@ -39,3 +39,9 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     return user
+
+
+# Simplified dependency for SQLite routes (hackathon MVP - no auth required)
+def get_current_user_sqlite():
+    """Simplified user dependency for SQLite routes - returns None (no auth for MVP)."""
+    return None
