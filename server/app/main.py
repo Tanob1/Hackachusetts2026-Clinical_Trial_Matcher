@@ -121,7 +121,8 @@ app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(trials.router)
 app.include_router(settings_router.router)
-app.include_router(admin.router)`napp.include_router(sqlite_routes.router)
+app.include_router(admin.router)
+app.include_router(sqlite_routes.router)
 
 
 @app.get("/")
@@ -132,6 +133,7 @@ async def root():
         "docs": "/docs",
         "disclaimer": "This is an informational matching tool, not medical advice.",
     }
+
 
 
 
