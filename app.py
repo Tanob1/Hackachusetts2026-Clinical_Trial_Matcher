@@ -27,6 +27,15 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Web UI authentication decorator
+def web_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # ============= Authentication Routes =============
 
 @app.route('/login', methods=['POST'])
@@ -82,9 +91,14 @@ def get_patient(patient_id):
     """Get patient by ID"""
     # For MVP, allow viewing any patient (for demo switching)
     # In production, add authorization check
-    patient = database.get_patient_by_user_id(patient_id)
+    conn = database.get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM patients WHERE id = ?', (patient_id,))
+    patient = cursor.fetchone()
+    conn.close()
+    
     if patient:
-        return jsonify(patient)
+        return jsonify(dict(patient))
     else:
         return jsonify({'error': 'Patient not found'}), 404
 
@@ -94,17 +108,14 @@ def get_patient(patient_id):
 @login_required
 def get_matches(patient_id):
     """Get matched trials for a patient"""
-    # Import matching module (we'll create this next)
-    try:
-        import matching
-    except ImportError:
-        return jsonify({'error': 'Matching engine not yet implemented'}), 501
+    import matching
     
     # Get patient
     conn = database.get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM patients WHERE id = ?', (patient_id,))
     patient = cursor.fetchone()
+    conn.close()
     
     if not patient:
         return jsonify({'error': 'Patient not found'}), 404
@@ -181,20 +192,20 @@ def get_demo_patients():
     
     return jsonify({'patients': patients})
 
-# ============= Web UI Routes (to be implemented) =============
+# ============= Web UI Routes =============
 
 @app.route('/')
 def index():
     """Login page"""
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
-    return '<h1>Clinical Trial Matcher</h1><p>Web UI coming soon. Use API endpoints for now.</p><p>Try: POST /login with {"username": "sarah.chen", "password": "demo123"}</p>'
+    return render_template('login.html')
 
 @app.route('/dashboard')
-@login_required
+@web_login_required
 def dashboard():
     """Patient dashboard"""
-    return '<h1>Dashboard</h1><p>Dashboard UI coming soon!</p>'
+    return render_template('dashboard.html')
 
 # ============= Health Check =============
 
@@ -205,6 +216,7 @@ def health():
         'status': 'healthy',
         'version': '1.0',
         'endpoints': {
+            'web': ['GET /', 'GET /dashboard'],
             'auth': ['POST /login', 'POST /logout'],
             'patient': ['GET /api/patient/me', 'GET /api/patient/<id>'],
             'matching': ['GET /api/matches/<patient_id>'],
@@ -217,8 +229,8 @@ if __name__ == '__main__':
     print("\n" + "="*50)
     print("🚀 Clinical Trial Matcher API Server")
     print("="*50)
-    print("\n📚 API Documentation: See API_DOCUMENTATION.md")
-    print("🔗 Base URL: http://localhost:5000")
+    print("\n🌐 Web App: http://localhost:5000")
+    print("📚 API Documentation: See API_DOCUMENTATION.md")
     print("🧪 Sample user: sarah.chen / demo123")
     print("\n💡 Quick test:")
     print('   curl -X POST http://localhost:5000/login \\')
