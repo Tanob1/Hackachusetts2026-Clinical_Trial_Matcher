@@ -102,12 +102,12 @@ if os.path.exists(static_dir):
 
 # Web UI routes
 @app.get("/web")
-async def web_dashboard():
-    """Serve the web dashboard UI."""
-    dashboard_path = os.path.join(static_dir, "dashboard.html")
-    if os.path.exists(dashboard_path):
-        return FileResponse(dashboard_path)
-    return {"error": "Web UI not found"}
+async def web_info():
+    """Serve info page directing to Flask UI."""  
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "FastAPI server - visit /docs for API documentation"}
 
 @app.get("/web/login")
 async def web_login():
