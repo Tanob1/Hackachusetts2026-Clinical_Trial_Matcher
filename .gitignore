@@ -36,3 +36,13 @@ htmlcov/
 
 # Logs
 *.log
+
+# Node.js / Mobile App
+node_modules/
+app/node_modules/
+app/.expo/
+app/.expo-shared/
+app/dist/
+app/npm-debug.log*
+app/yarn-debug.log*
+app/yarn-error.log*
