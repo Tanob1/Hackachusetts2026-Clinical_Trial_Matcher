@@ -102,6 +102,47 @@ def get_patient(patient_id):
     else:
         return jsonify({'error': 'Patient not found'}), 404
 
+@app.route('/api/patient/update-conditions', methods=['POST'])
+@login_required
+def update_patient_conditions():
+    """Update patient's medical conditions"""
+    data = request.get_json()
+    new_conditions = data.get('conditions', '').strip()
+    
+    if not new_conditions:
+        return jsonify({'success': False, 'error': 'Conditions cannot be empty'}), 400
+    
+    try:
+        # Get current patient
+        user_id = session.get('user_id')
+        patient = database.get_patient_by_user_id(user_id)
+        
+        if not patient:
+            return jsonify({'success': False, 'error': 'Patient not found'}), 404
+        
+        # Update conditions in database
+        conn = database.get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE patients 
+            SET conditions = ? 
+            WHERE user_id = ?
+        ''', (new_conditions, user_id))
+        conn.commit()
+        conn.close()
+        
+        # Clear matching cache since conditions changed
+        import matching
+        matching.clear_cache()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Conditions updated successfully',
+            'conditions': new_conditions
+        })
+    except Exception as e:
+        print(f"Error updating conditions: {e}")
+        return jsonify({'success': False, 'error': 'Database error'}), 500
 # ============= Trial Matching Routes =============
 
 @app.route('/api/matches/<int:patient_id>')
@@ -429,5 +470,7 @@ if __name__ == '__main__':
     print("\n" + "="*50 + "\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
 
 

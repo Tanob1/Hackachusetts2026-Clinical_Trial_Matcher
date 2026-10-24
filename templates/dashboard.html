@@ -196,6 +196,9 @@
                     <div class="mt-3" id="conditionsList">
                         <strong>Conditions:</strong>
                     </div>
+                <button class="btn btn-outline-primary btn-sm mt-3" onclick="showEditProfile()">
+                    ✏️ Edit Medical Conditions
+                </button>
                 </div>
                 <div class="alert alert-info mb-0" style="max-width: 250px;">
                     <small><strong>🔬 Medical Intelligence</strong><br>
@@ -241,7 +244,45 @@
         <div id="trialsList"></div>
     </div>
 
-    <!-- Trial Detail Modal -->
+        <!-- Edit Profile Modal -->
+    <div class="modal fade" id="editProfileModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Medical Conditions</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="conditionsInput" class="form-label">
+                            <strong>Medical Conditions</strong>
+                        </label>
+                        <textarea class="form-control" id="conditionsInput" rows="4" 
+                                  placeholder="Enter conditions separated by commas&#10;Example: Breast Cancer, Diabetes, Hypertension"></textarea>
+                        <small class="form-text text-muted">
+                            Separate multiple conditions with commas. Our system uses ICD-10 medical codes to find the best matches.
+                        </small>
+                    </div>
+                    <div class="alert alert-info">
+                        <small><strong>💡 Tip:</strong> Be specific with your conditions. For example:
+                        <ul class="mb-0 mt-2">
+                            <li>"Type 2 Diabetes" instead of just "Diabetes"</li>
+                            <li>"Breast Cancer" instead of just "Cancer"</li>
+                            <li>"Chronic Depression" for mental health</li>
+                        </ul>
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveConditions()">
+                        💾 Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Trial Detail Modal -->
     <div class="modal fade" id="trialModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -582,7 +623,79 @@
                 `📊 ${filtered.length} Matched Trial${filtered.length !== 1 ? 's' : ''} (filtered)`;
         }
 
-        async function logout() {
+        
+        let editProfileModal;
+
+        // Initialize edit modal on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            editProfileModal = new bootstrap.Modal(document.getElementById('editProfileModal'));
+        });
+
+        function showEditProfile() {
+            if (!currentPatient) {
+                alert('Please wait while profile loads...');
+                return;
+            }
+            
+            // Populate current conditions
+            document.getElementById('conditionsInput').value = currentPatient.conditions;
+            editProfileModal.show();
+        }
+
+        async function saveConditions() {
+            const newConditions = document.getElementById('conditionsInput').value.trim();
+            
+            if (!newConditions) {
+                alert('Please enter at least one medical condition');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/patient/update-conditions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ conditions: newConditions })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update conditions');
+                }
+                
+                const result = await response.json();
+                
+                // Close modal
+                editProfileModal.hide();
+                
+                // Show success message
+                showSuccessAlert('✅ Medical conditions updated successfully! Refreshing matches...');
+                
+                // Reload profile and matches
+                await loadPatientProfile();
+                
+            } catch (error) {
+                console.error('Error updating conditions:', error);
+                alert('Failed to update conditions. Please try again.');
+            }
+        }
+
+        function showSuccessAlert(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '9999';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+async function logout() {
             try {
                 await fetch('/logout', { method: 'POST', credentials: 'include' });
                 window.location.href = '/';
@@ -593,3 +706,4 @@
     </script>
 </body>
 </html>
+

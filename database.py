@@ -340,6 +340,21 @@ def get_referral_by_code(referral_code):
     conn.close()
     return dict(referral) if referral else None
 
+
+
+def update_patient_conditions(user_id, conditions):
+    """Update patient's medical conditions"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE patients 
+        SET conditions = ? 
+        WHERE user_id = ?
+    ''', (conditions, user_id))
+    conn.commit()
+    rows_affected = cursor.rowcount
+    conn.close()
+    return rows_affected > 0
 if __name__ == '__main__':
     print("Initializing database...")
     init_db()
@@ -348,3 +363,4 @@ if __name__ == '__main__':
     init_provider_tables()
     create_demo_providers()
     print("\n✅ Database setup complete!")
+
