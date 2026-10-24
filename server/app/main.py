@@ -13,7 +13,8 @@ import os
 
 from app.config import get_settings
 from app.database import init_db, async_session
-from app.routers import auth, profile, trials, settings as settings_router, admin`nfrom app.routers import sqlite_routes
+from app.routers import auth, profile, trials, settings as settings_router, admin
+from app.routers import sqlite_routes
 from app.ctgov_sync import sync_trials
 
 settings = get_settings()
@@ -131,6 +132,7 @@ async def root():
         "docs": "/docs",
         "disclaimer": "This is an informational matching tool, not medical advice.",
     }
+
 
 
 
